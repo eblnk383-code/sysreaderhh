@@ -1,0 +1,17 @@
+name: Build .dylib
+on: push
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - run: |
+          echo '#include <stdio.h>
+          #include <dirent.h>
+          __attribute__((constructor)) void start() {
+              printf("LOADED!\n");
+          }' > sysreader.c
+          clang -dynamiclib -arch arm64 -o sysreader.dylib sysreader.c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sysreader
+          path: sysreader.dylib
