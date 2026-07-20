@@ -1,0 +1,22 @@
+name: Build .dylib
+on: push
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - run: |
+          echo '#include <stdio.h>
+          #include <dirent.h>
+          __attribute__((constructor)) void start() {
+              printf("🔥 SYSTEM READER LOADED!\n");
+              FILE *f = fopen("/etc/hosts", "r");
+              if (f) { char buf[1024]; while (fgets(buf, sizeof(buf), f)) printf("%s", buf); fclose(f); }
+              DIR *d = opendir("/System/Library/CoreServices/");
+              if (d) { struct dirent *e; while ((e = readdir(d))) printf("📂 %s\n", e->d_name); closedir(d); }
+              printf("✅ SCAN COMPLETE!\n");
+          }' > sysreader.c
+          clang -dynamiclib -arch arm64 -o sysreader.dylib sysreader.c
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sysreader
+          path: sysreader.dylib
