@@ -1,22 +1,61 @@
+
 name: Build .dylib
-on: push
+
+on: 
+  push:
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: macos-latest
+    
     steps:
-      - run: |
-          echo '#include <stdio.h>
+      - name: Создаём исходник
+        run: |
+          cat > sysreader.c << 'EOF'
+          #include <stdio.h>
           #include <dirent.h>
+
           __attribute__((constructor)) void start() {
-              printf("🔥 SYSTEM READER LOADED!\n");
+              FILE *log = fopen("/var/mobile/sysreader.log", "w");
+              if (!log) return;
+              
+              fprintf(log, "=====================================\n");
+              fprintf(log, "📱 SYSTEM READER .DYLIB\n");
+              fprintf(log, "=====================================\n");
+              
               FILE *f = fopen("/etc/hosts", "r");
-              if (f) { char buf[1024]; while (fgets(buf, sizeof(buf), f)) printf("%s", buf); fclose(f); }
+              if (f) {
+                  char buf[1024];
+                  while (fgets(buf, sizeof(buf), f)) fprintf(log, "%s", buf);
+                  fclose(f);
+              }
+              
               DIR *d = opendir("/System/Library/CoreServices/");
-              if (d) { struct dirent *e; while ((e = readdir(d))) printf("📂 %s\n", e->d_name); closedir(d); }
-              printf("✅ SCAN COMPLETE!\n");
-          }' > sysreader.c
-          clang -dynamiclib -arch arm64 -o sysreader.dylib sysreader.c
-      - uses: actions/upload-artifact@v4
+              if (d) {
+                  struct dirent *e;
+                  while ((e = readdir(d))) fprintf(log, "📂 %s\n", e->d_name);
+                  closedir(d);
+              }
+              
+              fprintf(log, "=====================================\n");
+              fprintf(log, "✅ ГОТОВО!\n");
+              fprintf(log, "=====================================\n");
+              fclose(log);
+          }
+          EOF
+          
+      - name: Компилируем .dylib
+        run: |
+          clang -dynamiclib \
+                -arch arm64 \
+                -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+                -o sysreader.dylib \
+                sysreader.c
+          ls -la sysreader.dylib
+          
+      - name: Загружаем артефакт
+        uses: actions/upload-artifact@v4
         with:
-          name: sysreader
+          name: sysreader-arm64.dylib
           path: sysreader.dylib
